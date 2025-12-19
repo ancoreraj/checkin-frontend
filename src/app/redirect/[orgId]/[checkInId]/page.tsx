@@ -22,7 +22,9 @@ export default function StatusPage() {
     const [statusData, setStatusData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [isTimedOut, setIsTimedOut] = useState(false);
     const pollInterval = useRef<NodeJS.Timeout | null>(null);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const fetchStatus = async () => {
         try {
@@ -42,19 +44,26 @@ export default function StatusPage() {
                 ];
 
                 if (terminalStates.includes(data.data.status)) {
-                    if (pollInterval.current) {
-                        clearInterval(pollInterval.current);
-                        pollInterval.current = null;
-                    }
+                    stopPolling();
                 }
             } else {
                 setError(data.message || 'Failed to fetch status');
             }
         } catch (err) {
             console.error('Polling error:', err);
-            // We don't set error state here to keep polling in case of temporary network glitch
         } finally {
             setLoading(false);
+        }
+    };
+
+    const stopPolling = () => {
+        if (pollInterval.current) {
+            clearInterval(pollInterval.current);
+            pollInterval.current = null;
+        }
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
         }
     };
 
@@ -63,11 +72,17 @@ export default function StatusPage() {
             fetchStatus();
             // Start polling every 3 seconds
             pollInterval.current = setInterval(fetchStatus, 3000);
+
+            // Global timeout after 60 seconds
+            timeoutRef.current = setTimeout(() => {
+                if (pollInterval.current) {
+                    stopPolling();
+                    setIsTimedOut(true);
+                }
+            }, 60000); // 1 minute
         }
 
-        return () => {
-            if (pollInterval.current) clearInterval(pollInterval.current);
-        };
+        return () => stopPolling();
     }, [checkInId]);
 
     const isSuccess = statusData?.status === CheckInStatus.SESSION_COMPLETED ||
@@ -103,6 +118,34 @@ export default function StatusPage() {
                             <h3>Analyzing Verification...</h3>
                             <p style={{ color: 'var(--text-muted)' }}>Hang tight, we're fetching your status.</p>
                         </div>
+                    </div>
+                ) : isTimedOut ? (
+                    <div className="glass-card" style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏱️</div>
+                        <h3>Verification taking longer than usual</h3>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
+                            We haven't received an update yet. This usually happens if the DigiLocker process is still in progress.
+                        </p>
+                        <button
+                            className="btn-primary"
+                            style={{ width: '100%' }}
+                            onClick={() => {
+                                setIsTimedOut(false);
+                                setLoading(true);
+                                fetchStatus();
+                                // Restart polling
+                                pollInterval.current = setInterval(fetchStatus, 3000);
+                                // Restart timeout
+                                timeoutRef.current = setTimeout(() => {
+                                    if (pollInterval.current) {
+                                        stopPolling();
+                                        setIsTimedOut(true);
+                                    }
+                                }, 60000);
+                            }}
+                        >
+                            Refresh Status
+                        </button>
                     </div>
                 ) : error ? (
                     <div className="glass-card" style={{ textAlign: 'center' }}>

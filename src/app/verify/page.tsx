@@ -73,9 +73,9 @@ export default function VerifyPage() {
                                 onChange={(e) => setOrgId(e.target.value)}
                                 required
                             />
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+                            {/* <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
                                 Don't have an ID? <Link href="/onboard" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Create one here</Link>.
-                            </span>
+                            </span> */}
                         </div>
 
                         {error && (
